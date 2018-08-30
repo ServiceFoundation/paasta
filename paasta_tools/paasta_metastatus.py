@@ -31,6 +31,11 @@ from mypy_extensions import TypedDict
 
 import paasta_tools.utils
 from paasta_tools import __version__
+from paasta_tools import adhoc_tools
+from paasta_tools import chronos_tools
+from paasta_tools import kubernetes_tools
+from paasta_tools import marathon_tools
+from paasta_tools import tron_tools
 from paasta_tools.autoscaling.autoscaling_cluster_lib import AutoscalingInfo
 from paasta_tools.autoscaling.autoscaling_cluster_lib import get_autoscaling_info_for_all_resources
 from paasta_tools.chronos_tools import get_chronos_client
@@ -43,11 +48,14 @@ from paasta_tools.mesos.master import MesosState
 from paasta_tools.mesos_tools import get_mesos_master
 from paasta_tools.metrics import metastatus_lib
 from paasta_tools.metrics.metastatus_lib import ResourceUtilization
+from paasta_tools.paasta_service_config_loader import PaastaServiceConfigLoader
+from paasta_tools.utils import DEFAULT_SOA_DIR
 from paasta_tools.utils import format_table
 from paasta_tools.utils import load_system_paasta_config
 from paasta_tools.utils import paasta_print
 from paasta_tools.utils import PaastaColors
 from paasta_tools.utils import print_with_indent
+from paasta_tools.utils import validate_service_instance
 
 
 log = logging.getLogger('paasta_metastatus')
@@ -341,7 +349,7 @@ def print_output(argv: Optional[List[str]]=None) -> None:
             # The last column from utilization_table_by_grouping_from_mesos_state is "Agent count", which will always be
             # 1 for per-slave resources, so delete it.
             for row in all_rows:
-                row.pop()
+                row.pop(-2)
 
             for line in format_table(all_rows):
                 print_with_indent(line, 4)
