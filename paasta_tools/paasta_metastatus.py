@@ -43,8 +43,6 @@ from paasta_tools.mesos.master import MesosState
 from paasta_tools.mesos_tools import get_mesos_master
 from paasta_tools.metrics import metastatus_lib
 from paasta_tools.metrics.metastatus_lib import ResourceUtilization
-from paasta_tools.paasta_service_config_loader import PaastaServiceConfigLoader
-from paasta_tools.utils import DEFAULT_SOA_DIR
 from paasta_tools.utils import format_table
 from paasta_tools.utils import load_system_paasta_config
 from paasta_tools.utils import paasta_print
