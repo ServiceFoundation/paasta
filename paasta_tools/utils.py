@@ -771,10 +771,6 @@ class InstanceConfig:
             return False
 
 
-# For mypy typing
-InstanceConfig_T = TypeVar('InstanceConfig_T', bound=InstanceConfig)
-
-
 def stringify_constraint(usc: UnstringifiedConstraint) -> Constraint:
     return [str(x) for x in usc]
 
