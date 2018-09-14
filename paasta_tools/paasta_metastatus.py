@@ -232,7 +232,6 @@ def get_service_instance_stats(service: str, instance: str, cluster: str) -> Opt
     if service is None or instance is None or cluster is None:
         return None
 
-    service_instance_stats: Dict[str, float] = {}
     try:
         instance_config = get_instance_config(service, instance, cluster)
         # Get all fields that are showed in the 'paasta metastatus -vvv' command
@@ -249,32 +248,57 @@ def get_service_instance_stats(service: str, instance: str, cluster: str) -> Opt
 
 
 def print_output(argv: Optional[List[str]]=None) -> None:
+    MARATHON_ENABLED = True
+    K8S_ENABLED = False
+
     chronos_config = None
     args = parse_args(argv)
 
     system_paasta_config = load_system_paasta_config()
 
-    master_kwargs = {}
-    # we don't want to be passing False to not override a possible True
-    # value from system config
-    if args.use_mesos_cache:
-        master_kwargs['use_mesos_cache'] = True
-    master = get_mesos_master(**master_kwargs)
+    if MARATHON_ENABLED:
+        master_kwargs = {}
+        # we don't want to be passing False to not override a possible True
+        # value from system config
+        if args.use_mesos_cache:
+            master_kwargs['use_mesos_cache'] = True
 
-    marathon_servers = get_marathon_servers(system_paasta_config)
-    marathon_clients = all_marathon_clients(get_marathon_clients(marathon_servers))
+        master = get_mesos_master(**master_kwargs)
 
-    try:
-        mesos_state = a_sync.block(master.state)
-        all_mesos_results = _run_mesos_checks(
-            mesos_master=master,
-            mesos_state=mesos_state,
-        )
-    except MasterNotAvailableException as e:
-        # if we can't connect to master at all,
-        # then bomb out early
-        paasta_print(PaastaColors.red("CRITICAL:  %s" % '\n'.join(e.args)))
-        raise FatalError(2)
+        marathon_servers = get_marathon_servers(system_paasta_config)
+        marathon_clients = all_marathon_clients(get_marathon_clients(marathon_servers))
+
+        try:
+            mesos_state = a_sync.block(master.state)
+            all_mesos_results = _run_mesos_checks(
+                mesos_master=master,
+                mesos_state=mesos_state,
+            )
+        except MasterNotAvailableException as e:
+            # if we can't connect to master at all,
+            # then bomb out early
+            paasta_print(PaastaColors.red("CRITICAL:  %s" % '\n'.join(e.args)))
+            raise FatalError(2)
+
+        marathon_results = _run_marathon_checks(marathon_clients)
+    else:
+        marathon_results = [metastatus_lib.HealthCheckResult(
+            message='Marathon is not configured to run here',
+            healthy=True,
+        )]
+        all_mesos_results = [metastatus_lib.HealthCheckResult(
+            message='Mesos is not configured to run here',
+            healthy=True,
+        )]
+
+    if K8S_ENABLED:
+        # TBD
+        ...
+    else:
+        k8s_results = [metastatus_lib.HealthCheckResult(
+            message='Kubernetesis not configured to run here',
+            healthy=True,
+        )]
 
     # Check to see if Chronos should be running here by checking for config
     chronos_config = load_chronos_config()
@@ -292,14 +316,14 @@ def print_output(argv: Optional[List[str]]=None) -> None:
             healthy=True,
         )]
 
-    marathon_results = _run_marathon_checks(marathon_clients)
-
     mesos_ok = all(metastatus_lib.status_for_results(all_mesos_results))
     marathon_ok = all(metastatus_lib.status_for_results(marathon_results))
+    k8s_ok = all(metastatus_lib.status_for_results(k8s_results))
     chronos_ok = all(metastatus_lib.status_for_results(chronos_results))
 
     mesos_summary = metastatus_lib.generate_summary_for_check("Mesos", mesos_ok)
     marathon_summary = metastatus_lib.generate_summary_for_check("Marathon", marathon_ok)
+    k8s_summary = metastatus_lib.generate_summary_for_check("Kubernetes", k8s_ok)
     chronos_summary = metastatus_lib.generate_summary_for_check("Chronos", chronos_ok)
 
     healthy_exit = True if all([mesos_ok, marathon_ok, chronos_ok]) else False
@@ -347,6 +371,7 @@ def print_output(argv: Optional[List[str]]=None) -> None:
             for line in format_table(all_rows):
                 print_with_indent(line, 4)
     metastatus_lib.print_results_for_healthchecks(marathon_summary, marathon_ok, marathon_results, args.verbose)
+    metastatus_lib.print_results_for_healthchecks(k8s_summary, k8s_ok, k8s_results, args.verbose)
     metastatus_lib.print_results_for_healthchecks(chronos_summary, chronos_ok, chronos_results, args.verbose)
 
     if not healthy_exit:
